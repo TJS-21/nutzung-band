@@ -103,13 +103,18 @@ export const register: Register = on => {
     const ctx = await read($, context)
     if (e.props.hasSurvey || (await read($, isHidden))) return next(e)
 
+    // Was andere Mods hier zeichnen (z. B. „Offene Punkte“), bleibt darunter stehen
+    const below = await next(e)
     const { Box, Button, Text } = $.ui.resolve(e)
     const now = await $.clock.now()
 
     if (list.length === 0 && ctx === null) {
       return (
-        <Box>
-          <Text dimColor>Nutzung: noch keine Messung – erscheint nach der ersten Antwort </Text>
+        <Box flexDirection="column">
+          <Box key="waiting">
+            <Text dimColor>Nutzung: noch keine Messung – erscheint nach der ersten Antwort </Text>
+          </Box>
+          {below}
         </Box>
       )
     }
@@ -135,6 +140,7 @@ export const register: Register = on => {
         <Box key="actions">
           <Button key="hide" label="Ausblenden" onPress={() => update($, isHidden, () => true)} />
         </Box>
+        {below}
       </Box>
     )
   })
