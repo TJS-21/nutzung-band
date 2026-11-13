@@ -189,37 +189,39 @@ export const register: Register = on => {
 
     return (
       <Box flexDirection="column">
-        {rows.map(r => {
+        {rows.map((r, i) => {
           const t = textBar(r.pct)
+          const isLast = i === rows.length - 1
           return (
-            <Box key={r.key} flexDirection="row" alignItems="center" gap={1}>
-              <Box width={6}>
-                <Text size="caption" dimColor>{r.label}</Text>
+            <Box key={r.key} flexDirection="row" alignItems="center" justifyContent="space-between">
+              <Box flexDirection="row" alignItems="center" gap={1}>
+                <Box width={6}>
+                  <Text size="caption" dimColor>{r.label}</Text>
+                </Box>
+                {Svg === undefined ? (
+                  <Text>
+                    <Text color={fill(r.pct, r.limit)}>{t.filled}</Text>
+                    <Text color={TRACK}>{t.empty}</Text>
+                  </Text>
+                ) : (
+                  <Svg source={svgBar(r.pct, r.limit)} alt={`${r.label} ${Math.round(r.pct)} %`} width={BAR_W} height={BAR_H} />
+                )}
+                <Box width={5}>
+                  <Text size="caption" tabular weight="medium">{String(Math.round(r.pct)).padStart(3)}%</Text>
+                </Box>
+                <Text size="caption" dimColor>{r.info}</Text>
               </Box>
-              {Svg === undefined ? (
-                <Text>
-                  <Text color={fill(r.pct, r.limit)}>{t.filled}</Text>
-                  <Text color={TRACK}>{t.empty}</Text>
-                </Text>
+              {/* „Ausblenden“ ganz rechts in der letzten Zeile (meist „Chat“) */}
+              {!isLast ? null : Svg === undefined ? (
+                <Button key="hide" onPress={hide}>
+                  Ausblenden
+                </Button>
               ) : (
-                <Svg source={svgBar(r.pct, r.limit)} alt={`${r.label} ${Math.round(r.pct)} %`} width={BAR_W} height={BAR_H} />
+                <Markdown key="hide" text={`[Ausblenden](${HIDE_URL})`} pressableLinks={[HIDE_URL]} onLinkPress={hide} />
               )}
-              <Box width={5}>
-                <Text size="caption" tabular weight="medium">{String(Math.round(r.pct)).padStart(3)}%</Text>
-              </Box>
-              <Text size="caption" dimColor>{r.info}</Text>
             </Box>
           )
         })}
-        <Box key="actions">
-          {Svg === undefined ? (
-            <Button key="hide" onPress={hide}>
-              Ausblenden
-            </Button>
-          ) : (
-            <Markdown key="hide" text={`[Ausblenden](${HIDE_URL})`} pressableLinks={[HIDE_URL]} onLinkPress={hide} />
-          )}
-        </Box>
         {below}
       </Box>
     )
