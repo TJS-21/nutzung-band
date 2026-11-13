@@ -1,0 +1,12 @@
+{
+  "name": "timo-schroeder-plugins",
+  "owner": {
+    "name": "Timo Schroeder"
+  },
+  "plugins": [
+    {
+      "name": "nutzung-band",
+      "source": "./"
+    }
+  ]
+}
