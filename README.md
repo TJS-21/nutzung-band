@@ -6,7 +6,7 @@ Zeigt direkt über dem Eingabefeld:
 - **Woche** – Verbrauch des Wochenkontingents und wann es zurückgesetzt wird
 - **Chat** – wie voll der Gesprächsspeicher der aktuellen Unterhaltung ist
 
-Grün bis 70 %, gelb bis 90 %, darüber rot. Zusätzlich kommt ein kurzer Hinweis, sobald ein Wert die Schwelle überschreitet: beim Gesprächsspeicher ab 70 %, beim 5-Stunden- und Wochenkontingent ab 80 %.
+Jeder Wert ist ein schmaler Balken: dunkelgrau die Gesamtmenge, blau der Füllstand. Ab der Schwelle wird der Füllstand rot, und einmal kommt ein kurzer Hinweis: beim Gesprächsspeicher ab 70 %, beim 5-Stunden- und Wochenkontingent ab 80 %. Im Terminal sind die Balken aus Textzeichen.
 Die Kontingent-Werte gibt es nur mit einem Claude-Abo. Sie erscheinen nach der ersten Antwort einer Sitzung.
 
 ## Installation

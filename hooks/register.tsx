@@ -13,12 +13,36 @@ const NAMES: Record<string, string> = {
   spend_limit: 'Budget',
 }
 
-const bar = (pct: number) => {
+// Ab wann ein Wert als kritisch gilt: Hinweis einmal beim Überschreiten, Balken rot
+const WARN_LIMIT = 80
+const WARN_CONTEXT = 70
+
+const TRACK = '#3A3A3C' // dunkelgrau: die Gesamtmenge
+const BLUE = '#4C8DFF' // Füllstand
+const RED = '#F0524F' // Füllstand ab der Schwelle
+
+const fill = (pct: number, limit: number) => (pct >= limit ? RED : BLUE)
+
+// Terminal: kann keine Grafik, daher schmaler Textbalken in denselben Farben
+const textBar = (pct: number) => {
   const filled = Math.max(0, Math.min(10, Math.round(pct / 10)))
-  return '█'.repeat(filled) + '░'.repeat(10 - filled)
+  return { filled: '━'.repeat(filled), empty: '━'.repeat(10 - filled) }
 }
 
-const color = (pct: number) => (pct >= 90 ? 'error' : pct >= 70 ? 'warning' : 'success')
+// Desktop, Handy, Editor: dünner, abgerundeter Streifen
+const BAR_W = 120
+const BAR_H = 5
+const svgBar = (pct: number, limit: number) => {
+  const p = Math.max(0, Math.min(100, pct))
+  const w = p === 0 ? 0 : Math.max(BAR_H, (BAR_W * p) / 100)
+  const r = BAR_H / 2
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${BAR_W}" height="${BAR_H}" viewBox="0 0 ${BAR_W} ${BAR_H}">` +
+    `<rect width="${BAR_W}" height="${BAR_H}" rx="${r}" fill="${TRACK}"/>` +
+    (w > 0 ? `<rect width="${w.toFixed(1)}" height="${BAR_H}" rx="${r}" fill="${fill(p, limit)}"/>` : '') +
+    `</svg>`
+  )
+}
 
 const pad = (n: number) => String(n).padStart(2, '0')
 
@@ -55,10 +79,6 @@ const k = (n: number) => (n >= 1000 ? `${Math.round(n / 1000)}k` : String(n))
 const keep = (list: { kind: string; percentUsed: number; resetsAt?: string }[]): Limit[] =>
   list.map(l => ({ kind: l.kind, percentUsed: l.percentUsed, resetsAt: l.resetsAt }))
 
-// Ab wann ein Hinweis kommt (einmal beim Überschreiten, nicht bei jedem Punkt)
-const WARN_LIMIT = 80
-const WARN_CONTEXT = 70
-
 type Toast = (text: string) => unknown
 
 const warn = (toast: Toast, before: Limit[], after: Limit[], ctxBefore: Context | null, ctxAfter: Context | null) => {
@@ -72,6 +92,8 @@ const warn = (toast: Toast, before: Limit[], after: Limit[], ctxBefore: Context 
     toast(`Gesprächsspeicher: ${ctxAfter.percent}% voll`)
   }
 }
+
+type Row = { key: string; label: string; pct: number; limit: number; info: string }
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
@@ -105,40 +127,68 @@ export const register: Register = on => {
 
     // Was andere Mods hier zeichnen (z. B. „Offene Punkte“), bleibt darunter stehen
     const below = await next(e)
-    const { Box, Button, Text } = $.ui.resolve(e)
+    const ui = $.ui.resolve(e)
+    const { Box, Button, Text } = ui
+    // Das Terminal kann keine Grafik: dort Textbalken
+    const Svg = e.surface !== 'terminal' && 'Svg' in ui ? ui.Svg : undefined
     const now = await $.clock.now()
 
     if (list.length === 0 && ctx === null) {
       return (
         <Box flexDirection="column">
           <Box key="waiting">
-            <Text dimColor>Nutzung: noch keine Messung – erscheint nach der ersten Antwort </Text>
+            <Text size="caption" dimColor>Nutzung: noch keine Messung – erscheint nach der ersten Antwort</Text>
           </Box>
           {below}
         </Box>
       )
     }
 
+    const rows: Row[] = list.map(l => ({
+      key: l.kind,
+      label: NAMES[l.kind] ?? l.kind,
+      pct: l.percentUsed,
+      limit: WARN_LIMIT,
+      info: formatReset(l.resetsAt, now),
+    }))
+    if (ctx !== null) {
+      rows.push({
+        key: 'context',
+        label: 'Chat',
+        pct: ctx.percent,
+        limit: WARN_CONTEXT,
+        info: `Gesprächsspeicher ${k(ctx.tokens)} von ${k(ctx.window)}`,
+      })
+    }
+
     return (
       <Box flexDirection="column">
-        {list.map(l => (
-          <Box key={l.kind}>
-            <Text dimColor>{(NAMES[l.kind] ?? l.kind).padEnd(6)} </Text>
-            <Text color={color(l.percentUsed)} mono>{bar(l.percentUsed)}</Text>
-            <Text tabular weight="semibold"> {String(Math.round(l.percentUsed)).padStart(3)}% </Text>
-            <Text dimColor>· {formatReset(l.resetsAt, now)}</Text>
-          </Box>
-        ))}
-        {ctx === null ? null : (
-          <Box key="context">
-            <Text dimColor>{'Chat'.padEnd(6)} </Text>
-            <Text color={color(ctx.percent)} mono>{bar(ctx.percent)}</Text>
-            <Text tabular weight="semibold"> {String(ctx.percent).padStart(3)}% </Text>
-            <Text dimColor>· Gesprächsspeicher {k(ctx.tokens)} von {k(ctx.window)}</Text>
-          </Box>
-        )}
+        {rows.map(r => {
+          const t = textBar(r.pct)
+          return (
+            <Box key={r.key} flexDirection="row" alignItems="center" gap={1}>
+              <Box width={6}>
+                <Text size="caption" dimColor>{r.label}</Text>
+              </Box>
+              {Svg === undefined ? (
+                <Text>
+                  <Text color={fill(r.pct, r.limit)}>{t.filled}</Text>
+                  <Text color={TRACK}>{t.empty}</Text>
+                </Text>
+              ) : (
+                <Svg source={svgBar(r.pct, r.limit)} alt={`${r.label} ${Math.round(r.pct)} %`} width={BAR_W} height={BAR_H} />
+              )}
+              <Box width={5}>
+                <Text size="caption" tabular weight="medium">{String(Math.round(r.pct)).padStart(3)}%</Text>
+              </Box>
+              <Text size="caption" dimColor>{r.info}</Text>
+            </Box>
+          )
+        })}
         <Box key="actions">
-          <Button key="hide" label="Ausblenden" onPress={() => update($, isHidden, () => true)} />
+          <Button key="hide" onPress={() => update($, isHidden, () => true)}>
+            <Text size="caption">Ausblenden</Text>
+          </Button>
         </Box>
         {below}
       </Box>
