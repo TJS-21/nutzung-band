@@ -7,7 +7,9 @@ Zeigt direkt über dem Eingabefeld:
 - **Chat** – wie voll der Gesprächsspeicher der aktuellen Unterhaltung ist
 
 Jeder Wert ist ein schmaler Balken: dunkelgrau die Gesamtmenge, blau der Füllstand. Ab der Schwelle wird der Füllstand rot, und einmal kommt ein kurzer Hinweis: beim Gesprächsspeicher ab 70 %, beim 5-Stunden- und Wochenkontingent ab 80 %. Im Terminal sind die Balken aus Textzeichen.
-Die Kontingent-Werte gibt es nur mit einem Claude-Abo. Sie erscheinen nach der ersten Antwort einer Sitzung.
+Die Kontingent-Werte gibt es nur mit einem Claude-Abo.
+
+**Woher die Werte kommen:** Alle zwei Minuten fragt die Leiste die aktuellen Kontingente bei Anthropic ab, dieselben Werte wie im Nutzungs-Menü der Claude-App. Die Anmeldung setzt Claude Code dabei selbst ein; die Leiste sieht keine Zugangsdaten und schickt nichts an andere Stellen. Klappt die Abfrage nicht, zeigt sie die Werte der letzten Antwort in der Sitzung. Der Gesprächsspeicher kommt immer aus der laufenden Sitzung.
 
 ## Installation
 

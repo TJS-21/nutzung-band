@@ -1,5 +1,5 @@
 import { atom, read, update } from 'claude-code'
-import type { Register } from 'claude-code'
+import type { EngineInterface, Register } from 'claude-code'
 
 import type { Context, Limit } from '../types'
 
@@ -100,11 +100,50 @@ const warn = (toast: Toast, before: Limit[], after: Limit[], ctxBefore: Context 
 
 type Row = { key: string; label: string; pct: number; limit: number; info: string }
 
+// Live-Werte, wie sie auch das Nutzungs-Menü der Claude-App zeigt. Die Anmeldung setzt
+// Claude Code selbst ein ($.session.authorize); die Mod sieht keine Zugangsdaten.
+// Klappt die Abfrage nicht, bleiben die Werte der letzten Antwort dieser Sitzung.
+const USAGE_URL = 'https://api.anthropic.com/api/oauth/usage'
+const LIVE_EVERY_MS = 2 * 60000
+let hasLive = false
+
+const fetchLive = async ($: EngineInterface): Promise<Limit[] | null> => {
+  try {
+    const a = await $.session.authorize()
+    if (!a) return null
+    const res = await $.http.fetch(USAGE_URL, { auth: a.handle, headers: { 'anthropic-beta': 'oauth-2025-04-20' } })
+    if (!res.ok) return null
+    const data = JSON.parse(res.text) as Record<string, unknown>
+    const out: Limit[] = []
+    for (const kind of ['five_hour', 'seven_day']) {
+      const w = data[kind] as { utilization?: unknown; resets_at?: unknown } | null | undefined
+      if (w && typeof w.utilization === 'number') {
+        out.push({ kind, percentUsed: Math.round(w.utilization * 10) / 10, resetsAt: typeof w.resets_at === 'string' ? w.resets_at : undefined })
+      }
+    }
+    return out.length > 0 ? out : null
+  } catch {
+    return null
+  }
+}
+
+const refreshLive = async ($: EngineInterface) => {
+  const live = await fetchLive($)
+  if (live === null) return
+  hasLive = true
+  const before = await read($, limits)
+  const ctx = await read($, context)
+  await update($, limits, () => live)
+  warn(t => $.ui.toast(t), before, live, ctx, ctx)
+}
+
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const result = await next(e)
     // Jede Minute neu zeichnen, damit Restzeit und Reset mitlaufen
     $.clock.every(60000, () => $.ui.invalidate('ui.render'))
+    // Alle zwei Minuten die Live-Werte holen
+    $.clock.every(LIVE_EVERY_MS, () => void refreshLive($))
     const usage = await $.session.usage()
     const before = await read($, limits)
     const ctxBefore = await read($, context)
@@ -113,13 +152,16 @@ export const register: Register = on => {
     await update($, limits, () => after)
     await update($, context, () => ctxAfter)
     warn(t => $.ui.toast(t), before, after, ctxBefore, ctxAfter)
+    void refreshLive($)
     return result
   })
 
   on('session.measure', async ($, e, next) => {
     const before = await read($, limits)
     const ctxBefore = await read($, context)
-    const after = keep(e.rateLimits)
+    // Mit Live-Werten kommen die Kontingente von dort (frischer); die Antwort stößt nur eine Abfrage an
+    const after = hasLive ? before : keep(e.rateLimits)
+    if (hasLive && e.changed.includes('rateLimits')) void refreshLive($)
     const ctxAfter = toContext(e.context)
     await update($, limits, () => after)
     await update($, context, () => ctxAfter)
