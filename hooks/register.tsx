@@ -21,6 +21,10 @@ const TRACK = '#3A3A3C' // dunkelgrau: die Gesamtmenge
 const BLUE = '#4C8DFF' // Füllstand
 const RED = '#F0524F' // Füllstand ab der Schwelle
 
+// „Ausblenden“ ist in der App ein kleiner Text-Link (Knöpfe zeichnet sie in fester Größe).
+// Gibt die App den Klick nicht weiter, öffnet der Link nur diese Repo-Seite.
+const HIDE_URL = 'https://github.com/TJS-21/nutzung-band'
+
 const fill = (pct: number, limit: number) => (pct >= limit ? RED : BLUE)
 
 // Terminal: kann keine Grafik, daher schmaler Textbalken in denselben Farben
@@ -128,7 +132,8 @@ export const register: Register = on => {
     // Was andere Mods hier zeichnen (z. B. „Offene Punkte“), bleibt darunter stehen
     const below = await next(e)
     const ui = $.ui.resolve(e)
-    const { Box, Button, Text } = ui
+    const { Box, Button, Text, Markdown } = ui
+    const hide = () => void update($, isHidden, () => true)
     // Das Terminal kann keine Grafik: dort Textbalken
     const Svg = e.surface !== 'terminal' && 'Svg' in ui ? ui.Svg : undefined
     const now = await $.clock.now()
@@ -186,9 +191,13 @@ export const register: Register = on => {
           )
         })}
         <Box key="actions">
-          <Button key="hide" onPress={() => update($, isHidden, () => true)}>
-            <Text size="caption">Ausblenden</Text>
-          </Button>
+          {Svg === undefined ? (
+            <Button key="hide" onPress={hide}>
+              Ausblenden
+            </Button>
+          ) : (
+            <Markdown key="hide" text={`[Ausblenden](${HIDE_URL})`} pressableLinks={[HIDE_URL]} onLinkPress={hide} />
+          )}
         </Box>
         {below}
       </Box>
