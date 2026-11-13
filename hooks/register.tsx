@@ -143,7 +143,7 @@ export const register: Register = on => {
     if (await read($, isHidden)) {
       return (
         <Box flexDirection="column">
-          <Box key="collapsed" backgroundColor={TRACK} paddingX={1}>
+          <Box key="collapsed" flexDirection="row" justifyContent="flex-end" backgroundColor={TRACK} paddingX={1}>
             {Svg === undefined ? (
               <Button key="show" onPress={show}>
                 {SHOW_LABEL}
