@@ -1,6 +1,6 @@
 {
   "name": "nutzung-band",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Zeigt über dem Eingabefeld die Nutzung (5-Stunden- und Wochenkontingent mit Reset-Zeit) und wie voll der Gesprächsspeicher ist",
   "types": "./types/index.d.ts",
   "author": {

@@ -55,23 +55,46 @@ const k = (n: number) => (n >= 1000 ? `${Math.round(n / 1000)}k` : String(n))
 const keep = (list: { kind: string; percentUsed: number; resetsAt?: string }[]): Limit[] =>
   list.map(l => ({ kind: l.kind, percentUsed: l.percentUsed, resetsAt: l.resetsAt }))
 
+// Ab wann ein Hinweis kommt (einmal beim Überschreiten, nicht bei jedem Punkt)
+const WARN_LIMIT = 80
+const WARN_CONTEXT = 70
+
+type Toast = (text: string) => unknown
+
+const warn = (toast: Toast, before: Limit[], after: Limit[], ctxBefore: Context | null, ctxAfter: Context | null) => {
+  for (const l of after) {
+    const was = before.find(b => b.kind === l.kind)?.percentUsed ?? 0
+    if (l.percentUsed >= WARN_LIMIT && was < WARN_LIMIT) {
+      toast(`Nutzung ${NAMES[l.kind] ?? l.kind}: ${Math.round(l.percentUsed)}%`)
+    }
+  }
+  if (ctxAfter !== null && ctxAfter.percent >= WARN_CONTEXT && (ctxBefore?.percent ?? 0) < WARN_CONTEXT) {
+    toast(`Gesprächsspeicher: ${ctxAfter.percent}% voll`)
+  }
+}
+
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const result = await next(e)
     const usage = await $.session.usage()
-    if (usage.rateLimits.length > 0) await update($, limits, () => keep(usage.rateLimits))
-    await update($, context, () => toContext(usage.context))
+    const before = await read($, limits)
+    const ctxBefore = await read($, context)
+    const after = usage.rateLimits.length > 0 ? keep(usage.rateLimits) : before
+    const ctxAfter = toContext(usage.context)
+    await update($, limits, () => after)
+    await update($, context, () => ctxAfter)
+    warn(t => $.ui.toast(t), before, after, ctxBefore, ctxAfter)
     return result
   })
 
   on('session.measure', async ($, e, next) => {
-    await update($, limits, () => keep(e.rateLimits))
-    await update($, context, () => toContext(e.context))
-    for (const l of e.rateLimits) {
-      if (l.percentUsed >= 90 && e.changed.includes('rateLimits')) {
-        $.ui.toast(`Nutzung ${NAMES[l.kind] ?? l.kind}: ${l.percentUsed}%`)
-      }
-    }
+    const before = await read($, limits)
+    const ctxBefore = await read($, context)
+    const after = keep(e.rateLimits)
+    const ctxAfter = toContext(e.context)
+    await update($, limits, () => after)
+    await update($, context, () => ctxAfter)
+    warn(t => $.ui.toast(t), before, after, ctxBefore, ctxAfter)
     return next(e)
   })
 
