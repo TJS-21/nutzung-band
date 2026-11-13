@@ -103,6 +103,8 @@ type Row = { key: string; label: string; pct: number; limit: number; info: strin
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const result = await next(e)
+    // Jede Minute neu zeichnen, damit Restzeit und Reset mitlaufen
+    $.clock.every(60000, () => $.ui.invalidate('ui.render'))
     const usage = await $.session.usage()
     const before = await read($, limits)
     const ctxBefore = await read($, context)
@@ -170,13 +172,18 @@ export const register: Register = on => {
       )
     }
 
-    const rows: Row[] = list.map(l => ({
-      key: l.kind,
-      label: NAMES[l.kind] ?? l.kind,
-      pct: l.percentUsed,
-      limit: WARN_LIMIT,
-      info: formatReset(l.resetsAt, now),
-    }))
+    const rows: Row[] = list.map(l => {
+      // Ist der Reset-Zeitpunkt vorbei, ist das Kontingent wieder leer
+      const at = l.resetsAt === undefined ? NaN : Date.parse(l.resetsAt)
+      const isReset = !Number.isNaN(at) && at <= now
+      return {
+        key: l.kind,
+        label: NAMES[l.kind] ?? l.kind,
+        pct: isReset ? 0 : l.percentUsed,
+        limit: WARN_LIMIT,
+        info: isReset ? 'zurückgesetzt' : formatReset(l.resetsAt, now),
+      }
+    })
     if (ctx !== null) {
       rows.push({
         key: 'context',
